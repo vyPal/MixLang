@@ -1,0 +1,11 @@
+{
+  "name": "MixLang",
+  "version": "1.0.0",
+  "description": "A new mix project",
+  "main": "main.mixl",
+  "dependencies": {},
+  "languages": [
+    "js",
+    "py"
+  ]
+}

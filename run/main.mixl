@@ -1,0 +1,10 @@
+[JS]
+let x = "hello world"
+console.log("this and")
+console.log("this, should be saved as one script")
+console.log("Also, "+x)
+[PY]
+print("This will be separate")
+x = a
+[JS]
+console.log("And this too")

@@ -1,0 +1,25 @@
+{
+  "name": "mixlang",
+  "version": "0.0.1 ALPHA",
+  "description": "A programming language in which you can use multiple other programming languages in the same source file",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "vyPal",
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "mocha": "^10.0.0"
+  },
+  "dependencies": {
+    "boxen": "^5.1.2",
+    "chalk": "^4.1.2",
+    "inquirer": "^9.1.0",
+    "ora": "^5.4.1",
+    "python-shell": "^3.0.1",
+    "yargs": "^17.5.1"
+  },
+  "bin": {
+    "mix": "bin/index.js"
+  }
+}
