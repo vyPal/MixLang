@@ -38,6 +38,7 @@ if(argv._[0] == 'init') {
   if(argv.yes) {
     let initPath = argv._.length > 1 ? argv._[1] : '';
     console.log(chalk.green('Initializing a new default mix project...'));
+    if(!fs.existsSync(path.join(process.cwd(), initPath))) fs.mkdirSync(path.join(process.cwd(), initPath));
     let jsondata = {
       name: process.cwd().split(path.sep).pop(),
       version: "1.0.0",
@@ -76,6 +77,7 @@ if(argv._[0] == 'init') {
       }
     ]).then(settings => {
       let initPath = argv._.length > 1 ? argv._[1] : '';
+      if(!fs.existsSync(path.join(process.cwd(), initPath))) fs.mkdirSync(path.join(process.cwd(), initPath));
       console.log(chalk.green('Initializing a new default mix project...'));
       let jsondata = {
         name: settings.name,
