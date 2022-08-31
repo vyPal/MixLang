@@ -14,7 +14,7 @@
   "dependencies": {
     "boxen": "^5.1.2",
     "chalk": "^4.1.2",
-    "inquirer": "^9.1.0",
+    "inquirer": "^8.2.3",
     "ora": "^5.4.1",
     "python-shell": "^3.0.1",
     "yargs": "^17.5.1"

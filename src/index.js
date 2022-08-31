@@ -1,10 +1,10 @@
 let fs = require('fs');
 let path = require('path');
-let {PythonShell} = require('python-shell');
-const { exec } = require('node:child_process');
+const { exec, spawn } = require('node:child_process');
 const chalk = require('chalk');
 const ora = require('ora');
 const boxen = require('boxen');
+const process = require('node:process')
 
 let languages = {
   javascript: "js",
@@ -164,24 +164,35 @@ let I = (...args) => { console.log(i+" "+args); }
 class Mix {
   /**
    * @typedef {Object} MixOptions
-   * @property {boolean} [autoBuild=true] - Whether to automatically build the mix file
-   * @property {boolean} [autoRun=true] - Whether to automatically erun the mix file
+   * @property {boolean} [build=false] - Build the file and run in non-interactive mode
+   * @property {boolean} [run=false] - Build the file and run in interactive mode
    * @property {boolean} [debug=false] - Whether to print debug information
+   * @property {boolean|ReadableStream|Stream} [stdin=false] - Readable stream or if mix should use process.stdin (run only)
+   * @property {boolean|WritableStream|Stream} [stdout=true] - Writable stream or if mix should use process.stdout
+   * @property {boolean} [instantOut=false] - If the output should be instantly printed to stdout (build only)
    */
   /**
    * @constructor
    * @param {String} filePath - Full path to the file to be mixed
    * @param {MixOptions} opts - Options for mixing the file
    */
-  constructor(filePath, opts = {autoBuild: true, autoRun: true, debug: false}) {
+  constructor(filePath, opts = {build: false, run: false, debug: false, stdin: false, stdout: true, instantOut: false}) {
     this.filePath = filePath;
     this.opts = opts;
+    this.stdin = opts.stdin;
+    this.stdout = opts.stdout;
+    if(this.stdin == true || this.stdin == undefined) this.stdin = process.stdin;
+    if(this.stdout == true || this.stdout == undefined) this.stdout = process.stdout;
     this.globals = {};
     if(this.opts.debug) DEBUG = (...args) => {console.log(d+" "+args)};
-    if(this.opts.autoBuild) {
-      DEBUG('Starting automated build...')
-      this.build().catch((e) => {process.exit(1)})
-      DEBUG(c+'Finished automatic build.')
+    if(this.opts.build) {
+      DEBUG('Starting build...')
+      this.build().catch((err) => {console.log(`\n${e} Build failed: \n${err}`);process.exit(1)})
+      DEBUG(c+'Finished build.')
+    }else if(this.opts.run) {
+      DEBUG('Starting run...')
+      this.run().catch((err) => {process.exit(1)})
+      DEBUG(c+'Finished run.')
     }
   }
 
@@ -191,6 +202,7 @@ class Mix {
    */
   build() {
     let p = new Promise(async (resolve, reject) => {
+      if(this.stdin) W("Stdin is not needed when building");
       let code = await fs.promises.readFile(this.filePath, "utf8");
       await this.validateLanguages(code).catch((err) => reject(err));
       let seg = await this.segmentSeparation(code).catch((err) => reject(err));
@@ -198,18 +210,81 @@ class Mix {
       for(const segment of seg) {
         numSegmentsParsed += 1;
         await Parser.parseCodeSegment(segment.code, segment.lang, this.globals, numSegmentsParsed, seg.length).catch((err) => reject(err));
-        //await Compiler.prepCodeSegment(segment.code, segment.lang, this.globals, numSegmentsParsed, seg.length).catch((err) => reject(err));
+      }
+      let out = "";
+      let numSegmentsRun = 0;
+      for(const toRun of seg) {
+        numSegmentsRun += 1;
+        let spin = ora(`Running segment ${numSegmentsRun}/${seg.length}`).start();
+        let execute = new Promise(async (resolve, reject) =>{
+          let code = await Compiler.prepCodeSegment(toRun.code, toRun.lang, this.globals, numSegmentsRun, seg.length).catch((err) => reject(err));
+          if(toRun.lang == "js") {
+            if(!fs.existsSync(path.join(process.cwd(), "temp"))) {
+              await fs.promises.mkdir(path.join(process.cwd(), "temp"));
+            }
+            fs.writeFile(path.join(process.cwd(), "temp", "code.js"), code, (error) => {
+              if(error) reject(error);
+              exec(`node ${path.join(process.cwd(), "temp", "code.js")}`, (err, stdout, stderr) => {
+                if(err) {
+                  reject(err);
+                }else {
+                  fs.readFile(path.join(process.cwd(), "temp", "out.json"), (err, data) => {
+                    if(err) reject(err);
+                    let jsonout = JSON.parse(data);
+                    for(const key of Object.keys(jsonout)) {
+                      if(typeof jsonout[key] == "string") this.globals[key] = "\""+jsonout[key]+"\"";
+                      else this.globals[key] = jsonout[key];
+                    }
+                    resolve(stdout);
+                  });
+                }
+              });
+            });
+          } else if(toRun.lang == "py") {
+            if(!fs.existsSync(path.join(process.cwd(), "temp"))) {
+              fs.mkdirSync(path.join(process.cwd(), "temp"));
+            }
+            fs.writeFile(path.join(process.cwd(), "temp", "code.py"), code, (error) => {
+              if(error) reject(error);
+              exec(`python ${path.join(process.cwd(), "temp", "code.py")}`, (err, stdout, stderr) => {
+                if(err) {
+                  reject(err);
+                }else {
+                  fs.readFile(path.join(process.cwd(), "temp", "out.json"), (err, data) => {
+                    if(err) reject(err);
+                    let jsonout = JSON.parse(data);
+                    for(const key of Object.keys(jsonout)) {
+                      if(typeof jsonout[key] == "string") this.globals[key] = "\""+jsonout[key]+"\"";
+                      else this.globals[key] = jsonout[key];
+                    }
+                    resolve(stdout);
+                  });
+                }
+              });
+            });
+          }
+        })
+        let stdout = await execute.catch((err) => reject(err));
+        out += stdout;
+        spin.succeed()
       }
       console.log();
-      console.log(boxen(`${c} Finished building mix file.`, {padding: 1}));
+      console.log(boxen(`${c} Finished building mix file..`, {padding: 1}));
       console.log();
-      resolve();
+      resolve(out);
+      if(!this.opts.instantOut && this.stdout != false) this.stdout.write(out)
     });
     return p;
   }
 
   run() {
-
+    let p = new Promise(async (resolve, reject) => {
+      let stdin;
+      if(this.stdin == false) reject(new Error("Stdin is required when running in interactive mode"));
+      if(this.stdin == true) stdin = process.stdin;
+      else stdin = this.stdin;
+    });
+    return p;
   }
 
   /**
@@ -344,10 +419,10 @@ class Compiler {
         let o = await Parser.parseLine(line, lang).catch(err => {reject(err)});
         if(o.variablesDefined.length > 0) varsDefined.push(o.variablesDefined.map((val) => val.identifier));
       }
-      if(lang == "py") out += "import json\n";
+      if(lang == "py") out += "import json\nimport os\n";
       varsDefined = varsDefined.map(val => String(val))
-      for(const vrs of Object.keys(globals).filter(key => !varsDefined.includes(key))) {
-        if(lang == "js") {
+      for(const vrs of Object.keys(globals)) {
+        if(lang == "js" && !varsDefined.includes(vrs)) {
           out += `var ${vrs} = ${globals[vrs]};\n`;
         } else if(lang == "py") {
           out += `${vrs} = ${globals[vrs]}\n`;
@@ -355,19 +430,19 @@ class Compiler {
       }
       out += code;
       if(lang == "js") {
-        out += `(async function() {
-          const fs = require('fs');
-          const path = require('path');
-          let dout = {};
-          ${varsDefined.map(val => `dout['${val}'] = ${val};`).join('\n')}
-          fs.writeFileSync(path.join(__dirname, 'out.json'), JSON.stringify(dout, null, 2));
-        })()`;
+        out += `\n;(() => {
+const fs = require('fs');
+const path = require('path');
+let dout = {};
+${Object.keys(globals).map(val => `dout['${val}'] = ${val};`).join('\n')}
+fs.writeFileSync(path.join(__dirname, 'out.json'), JSON.stringify(dout));
+})()`;
       }else if(lang == "py") {
-        out += `let dout = {}
-          ${varsDefined.map(val => `dout['${val}'] = ${val}`).join('\n')}
-          with open('out.json', 'w') as f:
-            json.dump(dout, f)
-            f.close()`;
+        out += `\ndout = {}
+${Object.keys(globals).map(val => `dout['${val}'] = ${val}`).join('\n')}
+with open(os.path.dirname(os.path.abspath(__file__))+'/out.json', 'w') as f:
+\tjson.dump(dout, f)
+\tf.close()`;
       }
       if(err) spin.fail(`Prepared code segment (${numO}/${numM}) with ${err} errors: ${errText}`)
       else spin.succeed(`Prepared code segment (${numO}/${numM}) with no errors.`)
