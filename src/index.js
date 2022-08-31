@@ -2,7 +2,6 @@ let fs = require('fs');
 let path = require('path');
 const { exec, spawn } = require('node:child_process');
 const chalk = require('chalk');
-const ora = require('ora');
 const boxen = require('boxen');
 const process = require('node:process')
 
@@ -158,6 +157,8 @@ let E = (...args) => { console.log(e+" "+args); }
 let W = (...args) => { console.log(w+" "+args); }
 let I = (...args) => { console.log(i+" "+args); }
 
+let ora;
+
 /**
  * Version 2.0
  */
@@ -170,19 +171,37 @@ class Mix {
    * @property {boolean|ReadableStream|Stream} [stdin=false] - Readable stream or if mix should use process.stdin (run only)
    * @property {boolean|WritableStream|Stream} [stdout=true] - Writable stream or if mix should use process.stdout
    * @property {boolean} [instantOut=false] - If the output should be instantly printed to stdout (build only)
+   * @property {boolean} [noinfo=false] - If true no info messages will be printed
    */
   /**
    * @constructor
    * @param {String} filePath - Full path to the file to be mixed
    * @param {MixOptions} opts - Options for mixing the file
    */
-  constructor(filePath, opts = {build: false, run: false, debug: false, stdin: false, stdout: true, instantOut: false}) {
+  constructor(filePath, opts = {}) {
     this.filePath = filePath;
-    this.opts = opts;
-    this.stdin = opts.stdin;
-    this.stdout = opts.stdout;
-    if(this.stdin == true || this.stdin == undefined) this.stdin = process.stdin;
-    if(this.stdout == true || this.stdout == undefined) this.stdout = process.stdout;
+    this.opts = Object.assign({}, {build: false, run: false, debug: false, stdin: false, stdout: true, instantOut: false, noinfo: false}, opts);
+    this.stdin = this.opts.stdin;
+    this.stdout = this.opts.stdout;
+    if(this.stdin == true) this.stdin = process.stdin;
+    if(this.stdout == true) this.stdout = process.stdout;
+    if(this.opts.noinfo) {
+      class EmptyOra {
+        constructor() {}
+        start(args) {return this}
+        stop() {return this}
+        succeed() {return this}
+        succeed(args) {return this}
+        fail(args) {return this}
+        info(args) {return this}
+        warn(args) {return this}
+      }
+      ora = function(args) {
+        return new EmptyOra();
+      }
+    }else {
+      ora = require("ora");
+    }
     this.globals = {};
     if(this.opts.debug) DEBUG = (...args) => {console.log(d+" "+args)};
     if(this.opts.build) {
@@ -202,7 +221,7 @@ class Mix {
    */
   build() {
     let p = new Promise(async (resolve, reject) => {
-      if(this.stdin) W("Stdin is not needed when building");
+      if(this.stdin != false) W("Stdin is not needed when building");
       let code = await fs.promises.readFile(this.filePath, "utf8");
       await this.validateLanguages(code).catch((err) => reject(err));
       let seg = await this.segmentSeparation(code).catch((err) => reject(err));
@@ -235,6 +254,7 @@ class Mix {
                       if(typeof jsonout[key] == "string") this.globals[key] = "\""+jsonout[key]+"\"";
                       else this.globals[key] = jsonout[key];
                     }
+                    if(this.opts.instantOut && this.stdout != false) this.stdout.write(stdout);
                     resolve(stdout);
                   });
                 }
@@ -257,6 +277,7 @@ class Mix {
                       if(typeof jsonout[key] == "string") this.globals[key] = "\""+jsonout[key]+"\"";
                       else this.globals[key] = jsonout[key];
                     }
+                    if(this.opts.instantOut && this.stdout != false) this.stdout.write(stdout);
                     resolve(stdout);
                   });
                 }
@@ -268,9 +289,11 @@ class Mix {
         out += stdout;
         spin.succeed()
       }
-      console.log();
-      console.log(boxen(`${c} Finished building mix file..`, {padding: 1}));
-      console.log();
+      if(!this.opts.noinfo) {
+        console.log();
+        console.log(boxen(`${c} Finished building mix file..`, {padding: 1}));
+        console.log();
+      }
       resolve(out);
       if(!this.opts.instantOut && this.stdout != false) this.stdout.write(out)
     });
