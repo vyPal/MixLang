@@ -471,7 +471,6 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/out.json', 'w') as f:
   }
 }
 
-module.exports.MixProgram = MixProgram;
 module.exports.Mix = Mix;
 module.exports.Parser = Parser;
 module.exports.Compiler = Compiler;

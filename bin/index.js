@@ -7,7 +7,7 @@ const inquirer = require('inquirer');
 const fs = require('fs');
 const path = require('path');
 
-const mix = require('../src/index');
+const { Mix } = require('../src/index');
 const { fileURLToPath } = require('url');
 
 const argv = yargs(hideBin(process.argv))
@@ -21,7 +21,6 @@ const argv = yargs(hideBin(process.argv))
   .example('$0 build .', 'Build the main file and run in a non-interactive mode')
   .epilog('Version: 0.0.1')
   .boolean('yes')
-  .boolean('prealpha')
   .boolean('debug')
   .boolean('out')
   .boolean('noinfo')
@@ -29,10 +28,8 @@ const argv = yargs(hideBin(process.argv))
   .alias('o', 'out')
   .alias('d', 'debug')
   .alias('y', 'yes')
-  .alias('p', 'prealpha')
   .describe('yes', 'Automatically answer yes to prompts')
   .describe('out', 'Print the output to console during execution')
-  .describe('prealpha', 'Run using the pre-alpha version of mix')
   .describe('noinfo', 'Do not print info messages, only stdout and stderr')
   .demandCommand()
   .argv
@@ -104,40 +101,33 @@ if(argv._[0] == 'init') {
           console.log(chalk.red('No main file specified in mixconf.json'));
           process.exit(1);
         }
-        let mp = new mix.Mix(path.join(process.cwd(), argv._[1], mixconf.main), {build: true, debug: argv.debug||false, instantOut: argv.out, noinfo: argv.noinfo||false});
+        let mp = new Mix(path.join(process.cwd(), argv._[1], mixconf.main), {build: true, debug: argv.debug||false, instantOut: argv.out, noinfo: argv.noinfo||false});
       }
     }else {
-      let mp = new mix.Mix(path.join(process.cwd(), argv._[1]), {build: true, debug: argv.debug||false, instantOut: argv.out, noinfo: argv.noinfo||false});
+      let mp = new Mix(path.join(process.cwd(), argv._[1]), {build: true, debug: argv.debug||false, instantOut: argv.out, noinfo: argv.noinfo||false});
     }
   }else {
     console.log(chalk.red('No file specified'));
   }
 }else if(argv._[0] == 'run') {
-  if(argv.prealpha) {
-    if(argv._[1]) {
-      if(!fs.existsSync(argv._[1])) {
-        console.log(chalk.red('File not found: ' + argv._[1]));
-        process.exit(1);
-      }
-      if(fs.statSync(argv._[1]).isDirectory()) {
-        if(fs.existsSync(path.join(argv._[1], "mixconf.json"))) {
-          let mixconf = JSON.parse(fs.readFileSync(path.join(argv._[1], "mixconf.json")));
-          if(!mixconf.main) {
-            console.log(chalk.red('No main file specified in mixconf.json'));
-            process.exit(1);
-          }
-          let mp = new mix.Mix(path.join(process.cwd(), argv._[1], mixconf.main), {run: true, debug: argv.debug||false, stdin: true, instantOut: true, noinfo: argv.noinfo||false});
+  if(argv._[1]) {
+    if(!fs.existsSync(argv._[1])) {
+      console.log(chalk.red('File not found: ' + argv._[1]));
+      process.exit(1);
+    }
+    if(fs.statSync(argv._[1]).isDirectory()) {
+      if(fs.existsSync(path.join(argv._[1], "mixconf.json"))) {
+        let mixconf = JSON.parse(fs.readFileSync(path.join(argv._[1], "mixconf.json")));
+        if(!mixconf.main) {
+          console.log(chalk.red('No main file specified in mixconf.json'));
+          process.exit(1);
         }
-      }else {
-        let mp = new mix.Mix(path.join(process.cwd(), argv._[1]), {run: true, debug: argv.debug||false, stdin: true, instantOut: true, noinfo: argv.noinfo||false});
+        let mp = new Mix(path.join(process.cwd(), argv._[1], mixconf.main), {run: true, debug: argv.debug||false, stdin: true, instantOut: true, noinfo: argv.noinfo||false});
       }
     }else {
-      console.log(chalk.red('No file specified'));
+      let mp = new Mix(path.join(process.cwd(), argv._[1]), {run: true, debug: argv.debug||false, stdin: true, instantOut: true, noinfo: argv.noinfo||false});
     }
-  } else {
-    let mp = new mix.MixProgram(argv._[1]);
-    mp.load().then((seg) => {
-      mp.exec().then(res => console.log(res))
-    })
+  }else {
+    console.log(chalk.red('No file specified'));
   }
 }
