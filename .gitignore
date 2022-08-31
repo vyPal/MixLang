@@ -1,6 +1,9 @@
 #MixLang temp files
 temp
 
+#MixLang test files
+run
+
 # Logs
 logs
 *.log
