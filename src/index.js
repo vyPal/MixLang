@@ -205,13 +205,9 @@ class Mix {
     this.globals = {};
     if(this.opts.debug) DEBUG = (...args) => {console.log(d+" "+args)};
     if(this.opts.build) {
-      DEBUG('Starting build...')
-      this.build().catch((err) => {console.log(`\n${e} Build failed: \n${err}`);process.exit(1)})
-      DEBUG(c+'Finished build.')
+      return this.build().catch((err) => {console.log(`\n${e} Build failed: \n${err}`);process.exit(1)})
     }else if(this.opts.run) {
-      DEBUG('Starting run...')
-      this.run().catch((err) => {process.exit(1)})
-      DEBUG(c+'Finished run.')
+      return this.run().catch((err) => {process.exit(1)})
     }
   }
 
@@ -477,3 +473,5 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/out.json', 'w') as f:
 
 module.exports.MixProgram = MixProgram;
 module.exports.Mix = Mix;
+module.exports.Parser = Parser;
+module.exports.Compiler = Compiler;

@@ -1,7 +1,11 @@
 {
+  "name": "MixLang",
+  "version": "1.0.0",
+  "description": "A new mix project",
   "main": "test.mixl",
+  "dependencies": {},
   "languages": [
-    "javascript",
-    "python"
+    "js",
+    "py"
   ]
 }
