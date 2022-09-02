@@ -11,7 +11,7 @@ const { Mix } = require('../src/index');
 const { fileURLToPath } = require('url');
 
 const argv = yargs(hideBin(process.argv))
-  .scriptName('mix')
+  .scriptName('mxl')
   .usage('Usage: $0 <command> [options]')
   .command('init', 'Initialize a new mix project')
   .command('run', 'Build and run a mix file in interactive mode (with stdin)')
@@ -24,13 +24,17 @@ const argv = yargs(hideBin(process.argv))
   .boolean('debug')
   .boolean('out')
   .boolean('noinfo')
+  .boolean('bench')
   .alias('n', 'noinfo')
   .alias('o', 'out')
   .alias('d', 'debug')
   .alias('y', 'yes')
+  .alias('b', 'bench')
   .describe('yes', 'Automatically answer yes to prompts')
   .describe('out', 'Print the output to console during execution')
   .describe('noinfo', 'Do not print info messages, only stdout and stderr')
+  .describe('bench', 'Measures time taken by separate tasks')
+  .describe('debug', 'Prints debug messages')
   .demandCommand()
   .argv
 
@@ -43,7 +47,7 @@ if(argv._[0] == 'init') {
       name: process.cwd().split(path.sep).pop(),
       version: "1.0.0",
       description: "A new mix project",
-      main: "main.mixl",
+      main: "main.mxl",
       dependencies: {},
       languages: ["js", "py"]
     }
@@ -73,7 +77,7 @@ if(argv._[0] == 'init') {
         type: "input",
         name: "main",
         message: "What is the name of your main file?",
-        default: "main.mixl"
+        default: "main.mxl"
       }
     ]).then(settings => {
       let initPath = argv._.length > 1 ? argv._[1] : '';

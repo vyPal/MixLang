@@ -1,9 +1,10 @@
 let fs = require('fs');
 let path = require('path');
-const { exec, spawn } = require('node:child_process');
+const { exec, spawn } = require('child_process');
 const chalk = require('chalk');
 const boxen = require('boxen');
-const process = require('node:process')
+const process = require('process');
+const { performance } = require('perf_hooks');
 
 let languages = {
   javascript: "js",
@@ -45,7 +46,7 @@ class Mix {
    */
   constructor(filePath, opts = {}) {
     this.filePath = filePath;
-    this.opts = Object.assign({}, {build: false, run: false, debug: false, stdin: false, stdout: true, instantOut: false, noinfo: false}, opts);
+    this.opts = Object.assign({}, {build: false, run: false, debug: false, stdin: false, stdout: true, instantOut: false, noinfo: false, bench: false}, opts);
     this.stdin = this.opts.stdin;
     this.stdout = this.opts.stdout;
     if(this.stdin == true) this.stdin = process.stdin;
@@ -68,6 +69,7 @@ class Mix {
       ora = require("ora");
     }
     this.globals = {};
+    this.functions = {};
     if(this.opts.debug) DEBUG = (...args) => {console.log(d+" "+args)};
     if(this.opts.build) {
       return this.build().catch((err) => {console.log(`\n${e} Build failed: \n${err}`);process.exit(1)})
@@ -89,7 +91,7 @@ class Mix {
       let numSegmentsParsed = 0;
       for(const segment of seg) {
         numSegmentsParsed += 1;
-        await Parser.parseCodeSegment(segment.code, segment.lang, this.globals, numSegmentsParsed, seg.length).catch((err) => reject(err));
+        await Parser.parseCodeSegment(segment.code, segment.lang, this.globals, this.functions, numSegmentsParsed, seg.length).catch((err) => reject(err));
       }
       let out = "";
       let numSegmentsRun = 0;
@@ -97,7 +99,7 @@ class Mix {
         numSegmentsRun += 1;
         let spin = ora(`Running segment ${numSegmentsRun}/${seg.length}`).start();
         let execute = new Promise(async (resolve, reject) =>{
-          let code = await Compiler.prepCodeSegment(toRun.code, toRun.lang, this.globals, numSegmentsRun, seg.length).catch((err) => reject(err));
+          let code = await Compiler.prepCodeSegment(toRun.code, toRun.lang, this.globals, this.functions, numSegmentsRun, seg.length).catch((err) => reject(err));
           if(toRun.lang == "js") {
             if(!fs.existsSync(path.join(process.cwd(), "temp"))) {
               await fs.promises.mkdir(path.join(process.cwd(), "temp"));
@@ -163,10 +165,8 @@ class Mix {
 
   run() {
     let p = new Promise(async (resolve, reject) => {
-      let stdin;
-      if(this.stdin == false) reject(new Error("Stdin is required when running in interactive mode"));
-      if(this.stdin == true) stdin = process.stdin;
-      else stdin = this.stdin;
+      let code = await fs.promises.readFile(this.filePath, "utf8");
+      resolve();
     });
     return p;
   }
@@ -265,7 +265,7 @@ class Parser {
     return p;
   }
 
-  static parseCodeSegment(code, lang, globals, numO=1, numM=1) {
+  static parseCodeSegment(code, lang, globals, functions, numO=1, numM=1) {
     let p = new Promise(async (resolve, reject) => {
       let spin = ora(`Parsing code segment (${numO}/${numM})...`).start();
       let err = 0;
@@ -283,16 +283,115 @@ class Parser {
           }
         }
       }
+      let func = await Parser.isolateFunctions(code, lang);
+      if(func.length) {
+        for(const fn of func) {
+          if(Object.keys(functions).includes(fn.name)) {
+            err++;
+            errText = `\n${e} Function ${fn.name} is already defined`;
+          }else {
+            functions[fn.name] = {code: fn.code, variables: fn.variables, lang: lang};
+          }
+        }
+      }
       if(err) {spin.fail(`Parsed code segment (${numO}/${numM}) with ${err} errors: ${errText}`); reject();}
       else spin.succeed(`Parsed code segment (${numO}/${numM}) with no errors.`)
       resolve();
     });
     return p;
   }
+
+  static isolateFunctions(code, lang) {
+    let p = new Promise(async (resolve, reject) => {
+      let spin = ora('Isolating functions...').start();
+      let err = 0;
+      let errText = "";
+      let out = [];
+      let inFunction = false;
+      let inFunctionName = "";
+      let inFunctionVariables = [];
+      let inFunctionCode = "";
+      let awaitingBrackets = 0;
+      let onIndent = 0;
+      for(const line of code.split(/\n|\r|\r\n/g)) {
+        if(inFunction) {
+          if(lang == "js") {
+            if(line.includes("}") && awaitingBrackets == 0) {
+              inFunction = false;
+              out.push({name: inFunctionName, code: inFunctionCode+line, variables: inFunctionVariables});
+              inFunctionName = "";
+              inFunctionCode = "";
+              inFunctionVariables = [];
+            }else if(line.includes("}")) {
+              awaitingBrackets--;
+              inFunctionCode += line;
+            }else {
+              let brackets = line.replaceAll(/[^{]/g, '')
+              awaitingBrackets += brackets.length;
+              inFunctionCode += "\n"+line;
+            }
+          }else if(lang == "py") {
+            if(line.match(/^\s*/g)[0].length <= onIndent) {
+              inFunction = false;
+              out.push({name: inFunctionName, code: inFunctionCode+line, variables: inFunctionVariables});
+              inFunctionName = "";
+              inFunctionCode = "";
+              inFunctionVariables = [];
+            }else {
+              inFunctionCode += "\n"+line;
+            }
+          }
+        }else {
+          if(line.includes("function") && lang == "js") {
+            inFunction = true;
+            inFunctionName = line.match(/function\s*(\w*)/g)[0].replace(/function\s*/g, '');
+            for(const v of line.match(/\([^\)]*\)/g)[0].replace(/\(|\)/g, '').split(',')) {
+              if(v != "") inFunctionVariables.push(v);
+            }
+            inFunctionCode = line;
+          }else if(line.includes("def") && lang == "py") {
+            inFunction = true;
+            inFunctionName = line.match(/def\s*(\w*)/g)[0].replace(/def\s*/g, '');
+            for(const v of line.match(/\([^\)]*\)/g)[0].replace(/\(|\)/g, '').split(',')) {
+              if(v != "") inFunctionVariables.push(v);
+            }
+            inFunctionCode = line;
+            onIndent = line.match(/^\s*/g)[0].length;
+          }
+        }
+      }
+      if(inFunction) {
+        err++;
+        errText = `\n${e} Unclosed function ${inFunctionName}`;
+      }
+      if(err) {spin.fail(`Isolated functions with ${err} errors: ${errText}`); reject();}
+      else spin.succeed('Isolated functions with no errors.')
+      resolve(out);
+    });
+    return p;
+  }
+
+  static findCustomFunctionCalls(code, functions) {
+    let p = new Promise(async (resolve, reject) => {
+      let spin = ora('Finding custom function calls...').start();
+      let err = 0;
+      let errText = "";
+      let out = [];
+      for(const fn of Object.keys(functions)) {
+        if(code.includes(fn)) {
+          out.push(fn);
+        }
+      }
+      if(err) {spin.fail(`Found custom function calls with ${err} errors: ${errText}`); reject();}
+      else spin.succeed('Found custom function calls with no errors.')
+      resolve(out);
+    }).catch(err => {reject(err)});
+    return p;
+  }
 }
 
 class Compiler {
-  static async prepCodeSegment(code, lang, globals, numO=1, numM=1) {
+  static async prepCodeSegment(code, lang, globals, functions, numO=1, numM=1) {
     let p = new Promise(async (resolve, reject) => {
       let spin = ora(`Preparing code segment (${numO}/${numM})...`).start();
       let err = 0;
@@ -310,6 +409,14 @@ class Compiler {
           out += `var ${vrs} = ${globals[vrs]};\n`;
         } else if(lang == "py") {
           out += `${vrs} = ${globals[vrs]}\n`;
+        }
+      }
+      let fCalls = await Parser.findCustomFunctionCalls(code, functions).catch(err => {reject(err)});
+      let fDefined = await Parser.isolateFunctions(code, lang).catch(err => {reject(err)});
+      for(const fn of fCalls) {
+        if(!fDefined.map(val => val.name).includes(fn)) {
+          err++;
+          errText += `\n${err} Not yet functional, sorry!`;
         }
       }
       out += code;
