@@ -7,6 +7,7 @@ const process = require('process');
 const { performance } = require('perf_hooks');
 const md5 = require('md5');
 const ms = require('ms');
+const cliProgress = require('cli-progress');
 
 let languages = {
   javascript: "js",
@@ -42,6 +43,7 @@ class Mix {
    * @property {boolean} [noinfo=false] - If true no info messages will be printed
    * @property {boolean} [bench=false] - If true the time taken to run the code will be printed
    * @property {boolean} [execorder=false] - If true the execution order will be printed
+   * @property {boolean} [progress=false] - If a progress bar should be shown
    */
   /**
    * @constructor
@@ -50,10 +52,11 @@ class Mix {
    */
   constructor(filePath, opts = {}) {
     this.filePath = filePath;
-    this.opts = Object.assign({}, {build: false, run: false, debug: false, stdin: false, stdout: true, instantOut: false, noinfo: false, bench: false, execorder: false}, opts);
+    this.opts = Object.assign({}, {build: false, run: false, debug: false, stdin: false, stdout: true, instantOut: false, noinfo: false, bench: false, execorder: false, progress: false}, opts);
     this.stdin = this.opts.stdin;
     this.stdout = this.opts.stdout;
     this.binfo = {};
+    this.execorder = [];
     if(this.stdin == true) this.stdin = process.stdin;
     if(this.stdout == true) this.stdout = process.stdout;
     if(this.opts.noinfo) {
@@ -86,10 +89,16 @@ class Mix {
           let val = String(this.binfo[key]).split('.');
           bText += `\n     ${key}: ${val[0]+"."+val[1].slice(0, 4)}ms  `;
         }
-        bText += `\n\n   Build time: ${String(buildTime).slice(0, 5)}ms  `;
+        let val = String(buildTime).split('.');
+        bText += `\n\n   Build time: ${parseInt(val[0])/1000+val[1].slice(0, 4)}s  `;
         if(this.opts.bench) {
           console.log();
           console.log(boxen(bText, {padding: 1}));
+          console.log();
+        }
+        if(this.opts.execorder) {
+          console.log();
+          console.log(boxen(`${c} Execution order:\n\n${this.execorder.join("\n")}`, {padding: 1}));
           console.log();
         }
       })
@@ -115,6 +124,9 @@ class Mix {
       this.binfo['validation'] = pEnd-pStart;
       pStart = performance.now();
       let seg = await this.segmentSeparation(code).catch((err) => reject(err));
+      const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+      let bar1done = 0;
+      if(this.opts.progress) bar1.start(seg.length, 0);
       pEnd = performance.now();
       this.binfo['separation'] = pEnd-pStart;
       let numSegmentsParsed = 0;
@@ -146,6 +158,7 @@ class Mix {
                 await fs.promises.mkdir(path.join(process.cwd(), "temp"));
               }
               let m = md5(code);
+              this.execorder.push(m);
               fs.writeFile(path.join(process.cwd(), "temp", `${m}.mxl.js`), code, (error) => {
                 if(error) reject(error);
                 exec(`node ${path.join(process.cwd(), "temp", `${m}.mxl.js`)}`, (err, stdout, stderr) => {
@@ -173,6 +186,7 @@ class Mix {
                 fs.mkdirSync(path.join(process.cwd(), "temp"));
               }
               let m = md5(code);
+              this.execorder.push(m);
               fs.writeFile(path.join(process.cwd(), "temp", `${m}.mxl.py`), code, (error) => {
                 if(error) reject(error);
                 exec(`python ${path.join(process.cwd(), "temp", `${m}.mxl.py`)}`, (err, stdout, stderr) => {
@@ -210,7 +224,12 @@ class Mix {
                   if(!fs.existsSync(path.join(process.cwd(), "temp"))) {
                     fs.mkdirSync(path.join(process.cwd(), "temp"));
                   }
+                  cs.code.match(/##!!MIXER_REPLACE_[^!]!!##/g).forEach(r => {
+                    let value = this.globals[r.replace(/##!!MIXER_REPLACE_|!!##/g, '')];
+                    cs.code = cs.code.replace(r, value);
+                  })
                   let m = md5(cs.code);
+                  this.execorder.push(m);
                   fs.writeFile(path.join(process.cwd(), "temp", `${m}.mxl.js`), cs.code, (error) => {
                     if(error) reject(error);
                     exec(`node ${path.join(process.cwd(), "temp", `${m}.mxl.js`)}`, (err, stdout, stderr) => {
@@ -236,7 +255,12 @@ class Mix {
                   if(!fs.existsSync(path.join(process.cwd(), "temp"))) {
                     fs.mkdirSync(path.join(process.cwd(), "temp"));
                   }
+                  cs.code.match(/##!!MIXER_REPLACE_[^!]!!##/g).forEach(r => {
+                    let value = this.globals[r.replace(/##!!MIXER_REPLACE_|!!##/g, '')];
+                    cs.code = cs.code.replace(r, value);
+                  })
                   let m = md5(cs.code);
+                  this.execorder.push(m);
                   fs.writeFile(path.join(process.cwd(), "temp", `${m}.mxl.py`), cs.code, (error) => {
                     if(error) reject(error);
                     exec(`python ${path.join(process.cwd(), "temp", `${m}.mxl.py`)}`, (err, stdout, stderr) => {
@@ -264,7 +288,12 @@ class Mix {
                   if(!fs.existsSync(path.join(process.cwd(), "temp"))) {
                     fs.mkdirSync(path.join(process.cwd(), "temp"));
                   }
+                  cs.code.match(/##!!MIXER_REPLACE_[^!]!!##/g).forEach(r => {
+                    let value = this.globals[r.replace(/##!!MIXER_REPLACE_|!!##/g, '')];
+                    cs.code = cs.code.replace(r, value);
+                  })
                   let m = md5(cs.code);
+                  this.execorder.push(m);
                   fs.writeFile(path.join(process.cwd(), "temp", `${m}.mxl.js`), cs.code, (error) => {
                     if(error) reject(error);
                     exec(`node ${path.join(process.cwd(), "temp", `${m}.mxl.js`)}`, (err, stdout, stderr) => {
@@ -308,6 +337,7 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
 \tf.close()`;
                               }
                               let m1 = md5(o);
+                              this.execorder.push(m1);
                               fs.writeFile(path.join(process.cwd(), "temp", m1+".mxf."+cs.ficrlang), o, (error) => {
                                 if(error) reject(error);
                                 exec(`${cs.ficrlang == "js" ? "node": "python"} ${path.join(process.cwd(), "temp", m1+".mxf."+cs.ficrlang)}`, (err, so, stderr) => {
@@ -344,7 +374,12 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
                   if(!fs.existsSync(path.join(process.cwd(), "temp"))) {
                     fs.mkdirSync(path.join(process.cwd(), "temp"));
                   }
+                  cs.code.match(/##!!MIXER_REPLACE_[^!]!!##/g).forEach(r => {
+                    let value = this.globals[r.replace(/##!!MIXER_REPLACE_|!!##/g, '')];
+                    cs.code = cs.code.replace(r, value);
+                  })
                   let m = md5(cs.code);
+                  this.execorder.push(m);
                   fs.writeFile(path.join(process.cwd(), "temp", `${m}.mxl.py`), cs.code, (error) => {
                     if(error) reject(error);
                     exec(`python ${path.join(process.cwd(), "temp", `${m}.mxl.py`)}`, (err, stdout, stderr) => {
@@ -388,6 +423,7 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
 \tf.close()`;
                               }
                               let m1 = md5(o);
+                              this.execorder.push(m1);
                               fs.writeFile(path.join(process.cwd(), "temp", m1+".mxf."+cs.ficrlang), o, (error) => {
                                 if(error) reject(error);
                                 exec(`${cs.ficrlang == "js" ? "node": "python"} ${path.join(process.cwd(), "temp", m1+".mxf."+cs.ficrlang)}`, (err, so, stderr) => {
@@ -435,6 +471,8 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
         spin.succeed()
         let pEnd = performance.now();
         this.binfo[`block_${numSegmentsRun}_run`] = pEnd - pStart;
+        bar1done++;
+        if(this.opts.progress) bar1.update(bar1done);
       }
       if(!this.opts.noinfo) {
         console.log();
@@ -442,6 +480,7 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
         console.log();
       }
       resolve(out);
+      bar1.stop();
       if(!this.opts.instantOut && this.stdout != false) this.stdout.write(out)
     });
     return p;
@@ -474,7 +513,6 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
             spin.text = `Validating languages... ${err} errors found`
             reject();
           }
-          DEBUG('OK')
         }
       }
       if(!err) spin.succeed('Validated languages with no errors.')
@@ -502,7 +540,6 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
         if(/^\[\w*\]/g.test(line)) {
           if(inSegment != "") {
             out.push({lang: currentLang, code: inSegment});
-            DEBUG('Added segment')
             inSegment = "";
           }
           currentLang = line.replace(/\[|\]/g, '').toLowerCase();
@@ -532,15 +569,17 @@ class Parser {
       if(lang.toLowerCase() == "js") {
         if(/(let|var|const)\s\w*\s*=\s*[^;\n]*;?/g.test(line)) {
           line.match(/(let|var|const)\s\w*\s*=\s*[^;\n]*;?/g).forEach(match => {
-            let re = match.replace(/(let|var|const)\s*|\s*=\s*|;/g, '')
-            out.variablesDefined.push({identifier: re[0], value: re.slice(1-re.length)});
+            let ident = match.replace(/(let|const|var)\s*|\s*=\s*[^\n;];?/g, '');
+            let re = match.replace(/(let|var|const)\s*[^=]\s*=\s*|;/g, '')
+            out.variablesDefined.push({identifier: ident, value: re});
           });
         }
       }else if(lang.toLowerCase() == "py") {
         if(/(\w*)\s*=\s*[^;\n]*;?/g.test(line)) {
           line.match(/(\w*)\s*=\s*[^;\n]*;?/g).forEach(match => {
-            let re = match.replace(/\s*=\s*|;/g, '')
-            out.variablesDefined.push({identifier: re[0], value: re.slice(1-re.length)});
+            let ident = match.replace(/\s*=\s*[^\n;];?/g, '')
+            let re = match.replace(/[^=]\s*=\s*|;/g, '')
+            out.variablesDefined.push({identifier: ident, value: re});
           });
         }
       }
@@ -751,9 +790,9 @@ class Compiler {
             varsDefined = varsDefined.map(val => String(val))
             for(const vrs of Object.keys(globals)) {
               if(fc.lang == "js" && !varsDefined.includes(vrs)) {
-                o += `var ${vrs} = ${globals[vrs]};\n`;
+                o += `var ${vrs} = ##!!MIXER_REPLACE_${vrs}!!##;\n`;
               } else if(fc.lang == "py") {
-                o += `${vrs} = ${globals[vrs]}\n`;
+                o += `${vrs} = ##!!MIXER_REPLACE_${vrs}!!##\n`;
               }
             }
             let onlyFuncInCode = c.match(new RegExp(`${fc.name}\\([^)]*\\)`, 'g'))
@@ -792,9 +831,9 @@ with open(os.path.dirname(os.path.abspath(__file__))+'/'+os.path.basename(__file
             varsDefined = varsDefined.map(val => String(val))
             for(const vrs of Object.keys(globals)) {
               if(l == "js" && !varsDefined.includes(vrs)) {
-                o += `var ${vrs} = ${globals[vrs]};\n`;
+                o += `var ${vrs} = ##!!MIXER_REPLACE_${vrs}!!##;\n`;
               } else if(l == "py") {
-                o += `${vrs} = ${globals[vrs]}\n`;
+                o += `${vrs} = ##!!MIXER_REPLACE_${vrs}!!##\n`;
               }
             }
             o += c;

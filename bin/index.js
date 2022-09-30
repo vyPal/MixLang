@@ -26,18 +26,21 @@ const argv = yargs(hideBin(process.argv))
   .boolean('noinfo')
   .boolean('bench')
   .boolean('execorder')
+  .boolean('progress')
   .alias('n', 'noinfo')
   .alias('o', 'out')
   .alias('d', 'debug')
   .alias('y', 'yes')
   .alias('b', 'bench')
   .alias('e', 'execorder')
+  .alias('p', 'progress')
   .describe('yes', 'Automatically answer yes to prompts')
   .describe('out', 'Print the output to console during execution')
   .describe('noinfo', 'Do not print info messages, only stdout and stderr')
   .describe('bench', 'Measures time taken by separate tasks')
   .describe('debug', 'Prints debug messages')
   .describe('execorder', 'Prints the execution order of the tasks')
+  .describe('progress', 'Shows progress abr while building')
   .demandCommand()
   .argv
 
@@ -110,10 +113,10 @@ if(argv._[0] == 'init') {
           console.log(chalk.red('No main file specified in mixconf.json'));
           process.exit(1);
         }
-        let mp = new Mix(path.join(process.cwd(), argv._[1], mixconf.main), {build: true, debug: argv.debug, instantOut: argv.out, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder});
+        let mp = new Mix(path.join(process.cwd(), argv._[1], mixconf.main), {build: true, debug: argv.debug, instantOut: argv.out, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder, progress: argv.progress});
       }
     }else {
-      let mp = new Mix(path.join(process.cwd(), argv._[1]), {build: true, debug: argv.debug, instantOut: argv.out, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder});
+      let mp = new Mix(path.join(process.cwd(), argv._[1]), {build: true, debug: argv.debug, instantOut: argv.out, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder, progress: argv.progress});
     }
   }else {
     console.log(chalk.red('No file specified'));
@@ -131,10 +134,10 @@ if(argv._[0] == 'init') {
           console.log(chalk.red('No main file specified in mixconf.json'));
           process.exit(1);
         }
-        let mp = new Mix(path.join(process.cwd(), argv._[1], mixconf.main), {run: true, debug: argv.debug, stdin: true, instantOut: true, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder});
+        let mp = new Mix(path.join(process.cwd(), argv._[1], mixconf.main), {run: true, debug: argv.debug, stdin: true, instantOut: true, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder, progress: argv.progress});
       }
     }else {
-      let mp = new Mix(path.join(process.cwd(), argv._[1]), {run: true, debug: argv.debug, stdin: true, instantOut: true, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder});
+      let mp = new Mix(path.join(process.cwd(), argv._[1]), {run: true, debug: argv.debug, stdin: true, instantOut: true, noinfo: argv.noinfo, bench: argv.bench, execorder: argv.execorder, progress: argv.progress});
     }
   }else {
     console.log(chalk.red('No file specified'));
