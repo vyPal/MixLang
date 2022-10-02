@@ -16,6 +16,7 @@ const argv = yargs(hideBin(process.argv))
   .command('init', 'Initialize a new mix project')
   .command('run', 'Build and run a mix file in interactive mode (with stdin)')
   .command('build', 'Build and run a mix file in non-interactive mode (no stdin)')
+  .command('ct', 'Clear all files in temp folder')
   .example('$0 init -y', 'Initialize a new mix project with default settings')
   .example('$0 run .', 'Run the main file in interactive mode')
   .example('$0 build .', 'Build the main file and run in a non-interactive mode')
@@ -142,4 +143,9 @@ if(argv._[0] == 'init') {
   }else {
     console.log(chalk.red('No file specified'));
   }
+}else if(argv._[0] == 'ct') {
+  fs.readdirSync(path.join(process.cwd(), 'temp')).forEach((f) => {
+    fs.rmSync(path.join(process.cwd(), 'temp', f));
+  })
+  console.log(chalk.green('Temp folder cleared!'))
 }

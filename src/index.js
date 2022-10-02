@@ -575,8 +575,8 @@ class Parser {
           });
         }
       }else if(lang.toLowerCase() == "py") {
-        if(/(\w*)\s*=\s*[^;\n]*;?/g.test(line)) {
-          line.match(/(\w*)\s*=\s*[^;\n]*;?/g).forEach(match => {
+        if(/^(\w*)\s*=\s*[^;\n]*;?/g.test(line)) {
+          line.match(/^[^=]\s*=\s*[^;\n]*;?/g).forEach(match => {
             let ident = match.replace(/\s*=\s*[^\n;];?/g, '')
             let re = match.replace(/[^=]\s*=\s*|;/g, '')
             out.variablesDefined.push({identifier: ident, value: re});
