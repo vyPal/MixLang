@@ -22,7 +22,7 @@ func main() {
 					return err
 				}
 				for _, section := range sections {
-					fmt.Printf("Language: %s\nCode:\n%s\n", section.Language, section.Code)
+					fmt.Printf("Language: %s\nCode:\n%s\nVariables:\n%s\n", section.Language, section.Code, section.Variables)
 				}
 			} else {
 				fmt.Println("Please provide a file path.")
