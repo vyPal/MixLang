@@ -1,0 +1,7 @@
+[js]
+let x = 10;
+console.log("Hello from JS!");
+[py]
+x = x + 20
+print("Hello from python!")
+print("I got this value:", x)
