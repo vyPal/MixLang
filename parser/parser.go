@@ -60,9 +60,14 @@ func ParseFile(filePath string) ([]Section, error) {
 }
 
 func parseVariables(language, code string) []Variable {
-	// Placeholder function to parse variables, constants, functions, and classes
-	// This function should be implemented in the respective language-specific parser files
-	return []Variable{}
+	switch language {
+	case "js":
+		return parseJSVariables(code)
+	case "py":
+		return parsePyVariables(code)
+	default:
+		return nil
+	}
 }
 
 func detectDependencies(code string, variables []Variable) bool {
