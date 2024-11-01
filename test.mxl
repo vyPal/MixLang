@@ -1,7 +1,44 @@
 [js]
 let x = 10;
 console.log("Hello from JS!");
+
+function jsFunction() {
+    let y = 5;
+    console.log("JS Function, y:", y);
+}
+
+class JSClass {
+    constructor() {
+        this.z = 15;
+    }
+
+    printZ() {
+        console.log("JS Class, z:", this.z);
+    }
+}
+
 [py]
 x = x + 20
 print("Hello from python!")
 print("I got this value:", x)
+
+def py_function():
+    y = 10
+    print("Python Function, y:", y)
+
+class PyClass:
+    def __init__(self):
+        self.z = 25
+
+    def print_z(self):
+        print("Python Class, z:", self.z)
+
+[js]
+let a = 30;
+console.log("Another JS block, a:", a);
+console.log("Accessing Python variable x:", x);
+
+[py]
+b = 40
+print("Another Python block, b:", b)
+print("Accessing JS variable a:", a)
